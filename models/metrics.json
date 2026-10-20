@@ -1,0 +1,60 @@
+{
+  "dataset": "sms_spam_collection.tsv",
+  "n_rows_after_dedup": 5160,
+  "spam_rate": 0.1244,
+  "split": {
+    "train": 4128,
+    "test": 1032,
+    "seed": 42
+  },
+  "cross_validation_5fold_train_only": {
+    "naive_bayes": {
+      "pr_auc": 0.9729,
+      "roc_auc": 0.9895
+    },
+    "logreg": {
+      "pr_auc": 0.9845,
+      "roc_auc": 0.9939
+    },
+    "linear_svm_calibrated": {
+      "pr_auc": 0.9851,
+      "roc_auc": 0.9942
+    }
+  },
+  "selected_model": "linear_svm_calibrated",
+  "target_precision": 0.99,
+  "cv_at_selected_threshold": {
+    "threshold": 0.7287,
+    "precision": 0.9917,
+    "recall": 0.928,
+    "f1": 0.9588,
+    "roc_auc": 0.9942,
+    "pr_auc": 0.9851,
+    "confusion_matrix": {
+      "tn": 3610,
+      "fp": 4,
+      "fn": 37,
+      "tp": 477
+    }
+  },
+  "held_out_test": {
+    "threshold": 0.7287,
+    "precision": 0.9915,
+    "recall": 0.9141,
+    "f1": 0.9512,
+    "roc_auc": 0.9987,
+    "pr_auc": 0.9927,
+    "confusion_matrix": {
+      "tn": 903,
+      "fp": 1,
+      "fn": 11,
+      "tp": 117
+    }
+  },
+  "environment": {
+    "python": "3.13.16",
+    "scikit_learn": "1.9.1"
+  },
+  "trained_at": "2026-10-19T16:09:54.276288+00:00",
+  "caveat": "Trained on the UCI SMS Spam Collection (short English text messages). Performance on long-form email is not measured; retrain on email data with --data."
+}

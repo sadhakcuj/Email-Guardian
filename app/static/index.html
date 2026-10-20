@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spam Classifier</title>
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --ink:#1b1f24; --muted:#5b6572; --line:#d9dee5;
+          --spam:#b42318; --review:#b54708; --ham:#067647; --accent:#2f5bea; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#12151a; --card:#1b2027; --ink:#e8ebef; --muted:#9aa5b1; --line:#2f3640;
+            --spam:#f97066; --review:#fdb022; --ham:#47cd89; --accent:#7a9bff; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink);
+         font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  main { max-width:720px; margin:0 auto; padding:24px 16px 48px; }
+  h1 { font-size:1.5rem; margin:0 0 4px; }
+  p.sub { color:var(--muted); margin:0 0 20px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; }
+  label { display:block; font-weight:600; margin:12px 0 4px; }
+  input, textarea { width:100%; padding:10px; border:1px solid var(--line); border-radius:8px;
+                    background:transparent; color:inherit; font:inherit; }
+  textarea { min-height:140px; resize:vertical; }
+  input:focus, textarea:focus, button:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; margin-top:14px; }
+  button { padding:10px 16px; border-radius:8px; border:1px solid var(--line); background:transparent;
+           color:inherit; font:inherit; cursor:pointer; }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600; }
+  button:disabled { opacity:.6; cursor:progress; }
+  #result { margin-top:16px; display:none; }
+  .verdict { font-size:1.25rem; font-weight:700; }
+  .verdict.spam { color:var(--spam); } .verdict.review { color:var(--review); } .verdict.ham { color:var(--ham); }
+  .bar { height:10px; border-radius:6px; background:var(--line); overflow:hidden; margin:8px 0; }
+  .bar > span { display:block; height:100%; background:var(--accent); }
+  .chips { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+  .chip { font-size:.8rem; padding:2px 8px; border:1px solid var(--line); border-radius:999px; color:var(--muted); }
+  .meta { color:var(--muted); font-size:.85rem; margin-top:10px; }
+  .err { color:var(--spam); margin-top:12px; }
+  details { margin-top:16px; color:var(--muted); font-size:.9rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Spam Classifier</h1>
+  <p class="sub">Paste a message. The model returns a spam probability and a verdict.</p>
+
+  <form class="card" id="form">
+    <label for="subject">Subject (optional)</label>
+    <input id="subject" maxlength="1000" autocomplete="off">
+    <label for="body">Message</label>
+    <textarea id="body" maxlength="50000" required placeholder="Paste an email or text message here"></textarea>
+    <div class="row">
+      <button class="primary" id="go" type="submit">Classify</button>
+      <button type="button" id="ex-spam">Spam example</button>
+      <button type="button" id="ex-ham">Legit example</button>
+    </div>
+    <div id="error" class="err" role="alert"></div>
+  </form>
+
+  <section class="card" id="result" aria-live="polite">
+    <div class="verdict" id="verdict"></div>
+    <div class="bar" aria-hidden="true"><span id="fill"></span></div>
+    <div id="score"></div>
+    <div class="chips" id="signals"></div>
+    <div class="meta" id="meta"></div>
+  </section>
+
+  <details>
+    <summary>About this model</summary>
+    <p id="about">Loading…</p>
+  </details>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const EX_SPAM = "URGENT! You have won a £1000 prize. Call 09061701461 now or text CLAIM to 81010 to collect. T&Cs apply.";
+const EX_HAM = "Hi Priya, can we move tomorrow's design review to 3pm? I'll share the updated slides before then.";
+
+$("ex-spam").onclick = () => { $("body").value = EX_SPAM; $("subject").value = ""; };
+$("ex-ham").onclick = () => { $("body").value = EX_HAM; $("subject").value = "Design review"; };
+
+const LABELS = { spam: "Spam", review: "Needs review", ham: "Not spam" };
+
+$("form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  $("error").textContent = "";
+  $("go").disabled = true;
+  try {
+    const res = await fetch("/demo/predict", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ subject: $("subject").value, body: $("body").value }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(res.status === 429 ? "Too many requests. Wait a minute and retry." : (data.detail || "Request failed"));
+    $("result").style.display = "block";
+    $("verdict").textContent = LABELS[data.verdict];
+    $("verdict").className = "verdict " + data.verdict;
+    $("fill").style.width = (data.score * 100).toFixed(1) + "%";
+    $("score").textContent = "Spam probability: " + (data.score * 100).toFixed(1) + "% (flagged at ≥ " + (data.threshold * 100).toFixed(1) + "%)";
+    $("signals").replaceChildren(...data.signals.map((s) => Object.assign(document.createElement("span"), { className: "chip", textContent: s.replaceAll("_", " ") })));
+    $("meta").textContent = "Model: " + data.model + " · request " + data.request_id;
+  } catch (err) {
+    $("error").textContent = err.message;
+  } finally {
+    $("go").disabled = false;
+  }
+});
+
+fetch("/v1/model").then((r) => r.ok ? r.json() : null).then((m) => {
+  if (!m) { $("about").textContent = "Model details require an API key."; return; }
+  const t = m.held_out_test || {};
+  $("about").textContent = `Model: ${m.model}. Dataset: ${m.dataset}. Held-out test precision ${(t.precision*100).toFixed(1)}%, recall ${(t.recall*100).toFixed(1)}%. ${m.caveat || ""}`;
+}).catch(() => { $("about").textContent = "Model details unavailable."; });
+</script>
+</body>
+</html>

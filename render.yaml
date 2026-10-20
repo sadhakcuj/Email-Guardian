@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: spam-classifier
+    runtime: docker
+    plan: free
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: SPAM_API_KEYS
+        generateValue: true
+      - key: SPAM_LOG_LEVEL
+        value: INFO
